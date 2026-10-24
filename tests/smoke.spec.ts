@@ -24,7 +24,7 @@ test("the start page asks for a website and a work email", async ({ request }) =
   const response = await request.get("/");
   expect(response.status()).toBe(200);
   const html = await response.text();
-  expect(html).toContain("Find the people at your industry's events");
+  expect(html).toContain('action="/start"');
   expect(html).toContain('name="website"');
   expect(html).toContain('name="email"');
 });

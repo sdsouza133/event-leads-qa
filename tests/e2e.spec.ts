@@ -68,8 +68,8 @@ test.describe("a whole run", () => {
       await page.goto("/");
       await page.getByLabel("Your company's website").fill(`https://${DOMAIN}/`);
       await page.getByLabel("Your work email").fill(email);
-      await page.getByRole("button", { name: "Email me a sign-in link" }).click();
-      await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+      await page.getByRole("button", { name: "Get my free list" }).click();
+      await expect(page.getByRole("heading", { name: "Check your inbox" })).toBeVisible();
     });
 
     await test.step("sign in with the emailed link", async () => {
@@ -80,21 +80,23 @@ test.describe("a whole run", () => {
 
     await test.step("approve the plan", async () => {
       // The run page checks back every few seconds and reloads when the run moves on: first to its plan.
-      await expect(page.getByRole("heading", { name: `Your plan for ${DOMAIN}` })).toBeVisible({ timeout: 90_000 });
-      await page.getByRole("checkbox", { name: /Search this event/ }).first().check();
-      await page.getByRole("button", { name: "Approve and start" }).click();
+      await expect(page.getByRole("heading", { name: "Here's your plan" })).toBeVisible({ timeout: 90_000 });
+      await expect(page.getByText(DOMAIN, { exact: true })).toBeVisible();
+      const events = page.getByRole("region", { name: "Events" });
+      await events.getByRole("checkbox").first().check(); // the first three start picked: this keeps one at least
+      await page.getByRole("button", { name: "Find my leads" }).click();
     });
 
     await test.step("see the list", async () => {
-      await expect(page.getByRole("heading", { name: `Your leads for ${DOMAIN}` })).toBeVisible({ timeout: 150_000 });
-      const table = page.getByRole("table", { name: "Your leads, best fit first" });
-      await expect(table).toBeVisible();
-      await expect(table.getByRole("row")).not.toHaveCount(1); // more than the header row
+      await expect(page.getByRole("heading", { name: /ready to go/ })).toBeVisible({ timeout: 150_000 });
+      const list = page.getByRole("list", { name: "Your leads, best fit first" });
+      await expect(list).toBeVisible();
+      await expect(list.getByRole("listitem")).not.toHaveCount(0);
     });
 
     await test.step("download it as a CSV", async () => {
       const downloading = page.waitForEvent("download");
-      await page.getByRole("link", { name: "Download the list (CSV)" }).click();
+      await page.getByRole("link", { name: "Download CSV" }).click();
       const download = await downloading;
       expect(download.suggestedFilename()).toMatch(/\.csv$/);
       const csv = await readFile(await download.path(), "utf8");
