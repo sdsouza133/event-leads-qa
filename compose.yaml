@@ -1,0 +1,61 @@
+# The app the way a preview runs it, for the tests to run against: fake providers, emails kept in the outbox, a
+# throwaway Postgres. It's built from a checkout of sdsouza133/events-leads in ./app (set APP_DIR to use another).
+#
+#   SECRET_KEY=$(openssl rand -hex 32) QA_TOKEN=$(openssl rand -hex 24) docker compose up --build --detach --wait web worker
+name: event-leads-qa
+
+x-app: &app
+  image: event-leads-app:qa
+  build: ${APP_DIR:-./app}
+  environment:
+    ENV: staging
+    PROVIDERS: fake
+    DATABASE_URL: postgresql+psycopg://el:el@db:5432/el
+    BASE_URL: http://localhost:8000
+    SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY to a random value of at least 32 characters}
+    QA_TOKEN: ${QA_TOKEN:?set QA_TOKEN to a random value}
+    # Every end-to-end run uses one of the test company's free runs and counts against the sign-up limit.
+    FREE_RUNS_PER_DOMAIN: "100"
+    SIGN_UPS_PER_HOUR: "1000"
+    # Fake searches finish at once: check them, and the queue, often.
+    SEARCH_POLL_SECONDS: "1"
+    WORKER_POLL_SECONDS: "0.5"
+
+services:
+  db:
+    image: postgres:17  # the version Supabase runs in production
+    environment:
+      POSTGRES_USER: el
+      POSTGRES_PASSWORD: el
+      POSTGRES_DB: el
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U el -d el"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    <<: *app
+    ports: ["8000:8000"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully

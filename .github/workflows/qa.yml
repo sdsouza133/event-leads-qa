@@ -1,0 +1,99 @@
+name: QA
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      app_ref:
+        description: Branch, tag or commit of sdsouza133/events-leads to start and test
+        default: main
+      base_url:
+        description: Test this deployed site instead (end-to-end too only if the QA_TOKEN secret is set)
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  local:
+    name: Smoke and end-to-end (the app started here)
+    if: ${{ !inputs.base_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP_REF: ${{ inputs.app_ref || vars.APP_REF || 'main' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out the app
+        uses: actions/checkout@v4
+        with:
+          repository: sdsouza133/events-leads
+          ref: ${{ env.APP_REF }}
+          path: app
+      - name: Make throwaway secrets for the app
+        run: |
+          secret_key=$(openssl rand -hex 32)
+          qa_token=$(openssl rand -hex 24)
+          echo "::add-mask::$secret_key"
+          echo "::add-mask::$qa_token"
+          {
+            echo "SECRET_KEY=$secret_key"
+            echo "QA_TOKEN=$qa_token"
+          } >> "$GITHUB_ENV"
+      - name: Start the app with fake providers
+        run: docker compose up --build --detach --wait --wait-timeout 300 web worker
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npx playwright install --with-deps chromium
+      - name: Smoke and end-to-end tests
+        run: npx playwright test
+        env:
+          QA_BASE_URL: http://localhost:8000
+      - name: The app's logs
+        if: failure()
+        run: docker compose logs --no-color
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+
+  deployed:
+    name: Smoke (deployed site)
+    if: ${{ inputs.base_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      QA_BASE_URL: ${{ inputs.base_url }}
+      QA_TOKEN: ${{ secrets.QA_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # Without QA_TOKEN the end-to-end test skips itself, so only the smoke tests run.
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7

@@ -1,0 +1,20 @@
+{
+  "name": "event-leads-qa",
+  "private": true,
+  "description": "Independent QA for Event Leads: smoke and end-to-end tests that only see what a user sees.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:smoke": "playwright test --project=smoke",
+    "test:e2e": "playwright test --project=e2e",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "22.19.1",
+    "typescript": "5.9.3"
+  }
+}
