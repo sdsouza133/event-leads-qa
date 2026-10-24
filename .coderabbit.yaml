@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit reviews every pull request. These notes tell it what matters most in this repository.
+language: en-US
+reviews:
+  profile: assertive
+  high_level_summary: true
+  review_status: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: "tests/**"
+      instructions: |
+        Black-box tests of a live web app. Check in particular:
+        - tests only use what a user or an HTTP client can see: no database access and no app internals;
+        - nothing that creates data (a run, an account) can run against production: the end-to-end test must stay
+          behind its outbox check;
+        - waits are on a condition (expect, expect.poll), never a fixed sleep;
+        - no secret is printed or written into a report.
+    - path: ".github/workflows/**"
+      instructions: "Workflows should request the least permissions they need and never print secrets."
+  tools:
+    gitleaks:
+      enabled: true
+    actionlint:
+      enabled: true
+chat:
+  auto_reply: true
