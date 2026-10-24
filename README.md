@@ -36,7 +36,7 @@ QA_BASE_URL=https://events.theb2bdynamics.com npx playwright test
 | Variable | Default | What it's for |
 |---|---|---|
 | `QA_BASE_URL` | `http://localhost:8000` | The site under test |
-| `QA_TOKEN` | unset | Opens the site's outbox (`X-QA-Token`), which the end-to-end test needs |
+| `QA_TOKEN` | unset | Opens the site's outbox (`X-QA-Token`), which the end-to-end test needs. Except on the local stack, the tests refuse to start unless the site uses HTTPS, and requests carrying it never follow a redirect |
 | `QA_DOMAIN` | `example.org` | The test company. A reserved domain: the fake providers' people work at example.com, and the app leaves out anyone at the requester's own company |
 
 ## CI
@@ -44,6 +44,8 @@ QA_BASE_URL=https://events.theb2bdynamics.com npx playwright test
 `.github/workflows/qa.yml` runs both suites on every pull request and every push to `main`, against the app built
 from `events-leads` `main` (or the `APP_REF` repository variable). Run it by hand from the Actions tab to test another
 `app_ref`, or a deployed site with `base_url`. The end-to-end test runs there only if the `QA_TOKEN` secret is set.
-A failed run uploads the Playwright report, with a trace of each failed test, and prints the app's logs.
+A failed run uploads the Playwright report and prints the app's logs. Against the local stack the report holds a trace
+of each failed test. Against a deployed site there is no trace, since a trace records request headers, the QA token
+included.
 
 Tests never retry: a test that passes on its second try is a bug to find, not a result to report.

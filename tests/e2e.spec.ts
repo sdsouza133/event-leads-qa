@@ -16,15 +16,19 @@ const QA_TOKEN = process.env.QA_TOKEN ?? "";
 const DOMAIN = process.env.QA_DOMAIN ?? "example.org";
 const CSV_HEADER = "Name,Title,Company,Email,LinkedIn,Event,Attendance,Post,ICP score,Why they fit";
 
+// Requests that carry QA_TOKEN never follow a redirect: it would hand the token to wherever the redirect points.
+
 /** Whether this site keeps emails in an outbox our token opens. Production has none, so the test never runs there. */
 async function outboxOpens(request: APIRequestContext): Promise<boolean> {
   const response = await request.get(`/dev/outbox/latest?to=${encodeURIComponent(`nobody@${DOMAIN}`)}`, {
     headers: { "X-QA-Token": QA_TOKEN },
+    maxRedirects: 0,
   });
   const body = (await response.json().catch(() => ({}))) as { error?: string };
   return response.status() === 404 && body.error === "no email to that address";
 }
 
+/** The sign-in link in the newest email the outbox holds for `to`, waiting up to 30 seconds for it to arrive. */
 async function signInLink(request: APIRequestContext, to: string): Promise<string> {
   let link = "";
   await expect
@@ -32,6 +36,7 @@ async function signInLink(request: APIRequestContext, to: string): Promise<strin
       async () => {
         const response = await request.get(`/dev/outbox/latest?to=${encodeURIComponent(to)}`, {
           headers: { "X-QA-Token": QA_TOKEN },
+          maxRedirects: 0,
         });
         if (response.status() !== 200) {
           return "";
